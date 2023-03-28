@@ -4,7 +4,7 @@ library(ggpubr)
 library(rstatix)
 
 # Read CSV file to R
-raw_data <- read_csv("edited data.csv")
+raw_data <- read_csv("cleaned_data.csv")
 
 # format data for analysis
 edited_data <- raw_data %>%
