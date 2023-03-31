@@ -2,6 +2,7 @@ library(tidyverse)
 library(rlang)
 library(ggpubr)
 library(rstatix)
+library(stats)
 
 # Read CSV file to R
 raw_data <- read_csv("cleaned_data.csv")
@@ -70,8 +71,17 @@ anova_summary <- anova_test(
   between = subject_role,
   within = c(play_type, skill)
 )
+anova_summary_df <- get_anova_table (anova_summary)
+anova_summary_df
 
-get_anova_table (anova_summary)
+#Bonferroni Correction for ANOVA
+n_tests <- length(anova_summary_df$p)
+anova_bonferroni_p <- p.adjust(anova_summary_df$p, method = "bonferroni")
+anova_bonferroni_p
+
+anova_summary_adjusted <- cbind(anova_summary_df, anova_bonferroni_p)
+anova_summary_adjusted
+
 
 # -------------------------
 # Hypothesis 1: both teachers and parents view pretend play as more
