@@ -23,8 +23,21 @@ edited_data <- raw_data %>%
 # View descriptive statistics
 edited_data %>%
   group_by(subject_role, play_type) %>%
-  get_summary_stats(response, show = c("mean", "sd", "min", "max"))
+  get_summary_stats(response, show = c("mean", "sd", "min", "max","se"))
 
+composite_data %>%
+  group_by(subject_role, play_type) %>%
+  get_summary_stats(composite, show = c("mean", "sd"))
+
+composite_data %>%
+  group_by(subject_role, play_type) %>%
+  get_summary_stats(academic, show = c("mean", "sd"))
+
+edited_data %>%
+  group_by (subject_role) %>%
+  get_summary_stats(response, show = c("mean", "sd"))
+
+# Pivot data wide
 wide_data <- edited_data %>%
   pivot_wider(
     id_cols = c(subject_role,
@@ -33,16 +46,6 @@ wide_data <- edited_data %>%
     names_from = skill,
     values_from = response
   )
-
-# Summary ANOVA of all data
-
-anova_1a_parents <- anova_test(
-  data = edited_data,
-  dv = response,
-  wid = subject_id,
-  within = c(play_type, skill)
-)
-summary(anova_1a_parents)
 
 # Create composite score
 composite_data <- wide_data %>%
@@ -57,6 +60,18 @@ composite_data_wide <- composite_data %>%
     names_from = play_type,
     values_from = social:composite
   )
+
+#---------------------------------
+# Summary ANOVA of all data
+anova_summary <- anova_test(
+  data = edited_data,
+  dv = response,
+  wid = c(subject_id),
+  between = subject_role,
+  within = c(play_type, skill)
+)
+
+get_anova_table (anova_summary)
 
 # -------------------------
 # Hypothesis 1: both teachers and parents view pretend play as more
@@ -210,3 +225,4 @@ wilcox.test(
   data = composite_data_wide,
   alternative = "less"
 )
+
