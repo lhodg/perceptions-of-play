@@ -82,7 +82,6 @@ anova_bonferroni_p
 anova_summary_adjusted <- cbind(anova_summary_df, anova_bonferroni_p)
 anova_summary_adjusted
 
-
 # -------------------------
 # Hypothesis 1: both teachers and parents view pretend play as more
 # important for social/emotional/communication
