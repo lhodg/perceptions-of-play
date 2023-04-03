@@ -21,6 +21,22 @@ edited_data <- raw_data %>%
     values_to = "response"
   )
 
+# Pivot data wide
+wide_data <- edited_data %>%
+  pivot_wider(
+    id_cols = c(subject_role,
+                subject_id,
+                play_type),
+    names_from = skill,
+    values_from = response
+  )
+
+# Create composite score
+composite_data <- wide_data %>%
+  mutate(
+    composite = (social + emotional + communication) / 3
+  )
+
 # View descriptive statistics
 edited_data %>%
   group_by(subject_role, play_type) %>%
@@ -38,200 +54,133 @@ edited_data %>%
   group_by (subject_role) %>%
   get_summary_stats(response, show = c("mean", "sd"))
 
-# Pivot data wide
-wide_data <- edited_data %>%
-  pivot_wider(
-    id_cols = c(subject_role,
-                subject_id,
-                play_type),
-    names_from = skill,
-    values_from = response
-  )
-
-# Create composite score
-composite_data <- wide_data %>%
-  mutate(
-    composite = (social + emotional + communication) / 3
-  )
-
-# This form better for t-tests (above is better for plotting)
-composite_data_wide <- composite_data %>%
-  pivot_wider(
-    id_cols = c(subject_id, subject_role),
-    names_from = play_type,
-    values_from = social:composite
-  )
-
-#---------------------------------
-# Summary ANOVA of all data
-anova_summary <- anova_test(
-  data = edited_data,
-  dv = response,
-  wid = c(subject_id),
-  between = subject_role,
-  within = c(play_type, skill)
-)
-anova_summary_df <- get_anova_table (anova_summary)
-anova_summary_df
-
-#Bonferroni Correction for ANOVA
-n_tests <- length(anova_summary_df$p)
-anova_bonferroni_p <- p.adjust(anova_summary_df$p, method = "bonferroni")
-anova_bonferroni_p
-
-anova_summary_adjusted <- cbind(anova_summary_df, anova_bonferroni_p)
-anova_summary_adjusted
-
 # -------------------------
 # Hypothesis 1: both teachers and parents view pretend play as more
 # important for social/emotional/communication
 
-# Plot
-composite_data %>%
-  unite(
-    subject_and_play,
-    c(subject_role, play_type)
+composite_data_long <- composite_data %>%
+  select(
+    subject_id,
+    subject_role,
+    play_type,
+    developmental = composite,
+    academic
   ) %>%
-  ggplot() +
-  geom_boxplot(
-    aes(
-      subject_and_play,
-      composite
-    )
+  pivot_longer(
+    cols = c(developmental, academic),
+    names_to = "skill",
+    values_to = "response"
   )
 
-# tests for teachers ---------
-composite_data_teachers <- composite_data_wide %>%
+anova_summary <- composite_data_long %>%
+  group_by(
+    skill
+  ) %>%
+  anova_test(
+    dv = response,
+    wid = c(subject_id),
+    between = subject_role,
+    within = play_type
+  )
+
+anova_summary_df <- get_anova_table(anova_summary)
+anova_summary_df
+
+anova_summary2 <- composite_data_long %>%
+  group_by(
+    subject_role,
+    skill
+  ) %>%
+  anova_test(
+    dv = response,
+    wid = c(subject_id),
+    within = play_type
+  )
+
+anova_summary_df2 <- get_anova_table(anova_summary2)
+anova_summary_df2
+
+t_test <- composite_data_long %>%
   filter(
-    subject_role == "T"
+    skill != "academic"
+  ) %>%
+  group_by(
+    subject_role
+  ) %>%
+  pairwise_t_test(
+    response ~ play_type,
+    paired = TRUE,
+    p.adjust.method = "bonferroni",
+    alternative = "less",
+    detailed = TRUE
   )
 
-# paired t-test (assumptions violated, but robust)
-t.test(
-  Pair(composite_pp, composite_ic) ~ 1,
-  data = composite_data_teachers,
-  alternative = "greater"
-)
+t_test
 
-# fewer assumptions. Can't calculate exact p-value in this analysis
 wilcox.test(
   Pair(composite_pp, composite_ic) ~ 1,
   data = composite_data_teachers,
   alternative = "greater"
 )
 
-# same tests for parents ------
-composite_data_parents <- composite_data_wide %>%
-  filter(
-    subject_role == "P"
-  )
-
-t.test(
-  Pair(composite_pp, composite_ic) ~ 1,
-  data = composite_data_teachers,
-  alternative = "greater"
-)
-
-# t.test(
-#   x = composite_data_teachers$composite_pp,
-#   y = composite_data_teachers$composite_ic,
-#   alternative = "greater",
-#   paired = TRUE
-# )
-
 wilcox.test(
   Pair(composite_pp, composite_ic) ~ 1,
-  data = composite_data_teachers,
+  data = composite_data_parents,
   alternative = "greater"
 )
 
 # ---------------------------
 # Hypothesis 2: teachers will view pretend play as more important for development
 # compared with parents
-
-composite_data %>%
-  filter(
-    play_type == "pp"
+anova_summary3 <- composite_data_long %>%
+  filter(skill != "academic", play_type != "ic") %>%
+  group_by(
+    play_type,
+    skill
   ) %>%
-  ggplot() +
-  geom_boxplot(
-    aes(
-      subject_role,
-      composite
-    )
+  anova_test(
+    dv = response,
+    wid = c(subject_id),
+    between = subject_role
   )
 
-t.test(
-  composite_pp ~ subject_role,
-  data = composite_data_wide,
-  alternative = "less"
-)
-
-# t.test(
-#   composite_data_wide$composite_pp[composite_data_wide$subject_role == "P"],
-#   composite_data_wide$composite_pp[composite_data_wide$subject_role == "T"],
-#   alternative = "less"
-# )
-
-wilcox.test(
-  composite_pp ~ subject_role,
-  data = composite_data_wide,
-  alternative = "less"
-)
+anova_summary_df3 <- get_anova_table(anova_summary3)
+anova_summary_df3
 
 # -------------------------
 # Hypothesis 3: no difference between parents and teachers in beliefs on
 # imaginary play for school readiness
 
-composite_data %>%
+anova_summary4 <- composite_data_long %>%
   filter(
-    play_type == "ic"
+    skill == "academic"
   ) %>%
-  ggplot() +
-  geom_boxplot(
-    aes(
-      subject_role,
-      academic
-    )
+  group_by(
+    play_type,
+    skill
+  ) %>%
+  anova_test(
+    dv = response,
+    wid = c(subject_id),
+    between = subject_role
   )
 
-t.test(
-  academic_ic ~ subject_role,
-  data = composite_data_wide,
-  alternative = "two.sided"
-)
-
-wilcox.test(
-  academic_ic ~ subject_role,
-  data = composite_data_wide,
-  alternative = "two.sided"
-)
+anova_summary_df4 <- get_anova_table(anova_summary4)
+anova_summary_df4
 
 # ------------------------
 # Hypothesis 4: teachers likely to view pretend play as more important than
 # parents for academic readiness
 
-composite_data %>%
-  filter(
-    play_type == "pp"
+anova_summary5 <- composite_data_long %>%
+  filter(skill != "developmental", play_type != "ic") %>%
+  group_by(
+    play_type,
+    skill
   ) %>%
-  ggplot() +
-  geom_boxplot(
-    aes(
-      subject_role,
-      academic
-    )
+  anova_test(
+    dv = response,
+    wid = c(subject_id),
+    between = subject_role
   )
-
-t.test(
-  academic_pp ~ subject_role,
-  data = composite_data_wide,
-  alternative = "less"
-)
-
-wilcox.test(
-  academic_pp ~ subject_role,
-  data = composite_data_wide,
-  alternative = "less"
-)
-
+get_anova_table(anova_summary5)
